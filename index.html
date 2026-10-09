@@ -1,0 +1,1399 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>加速度積分 與 GPS 測速器 longhorn 5.0</title>
+  <style>
+  /* --- 基礎樣式還原 --- */
+  * { box-sizing: border-box; }
+
+  body { 
+    margin: 0; 
+    background: #121212; 
+    color: #e0e0e0; 
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+    display: flex; 
+    justify-content: center; 
+    padding: 12px; 
+    width: 100%;   
+  }
+
+  .calculator { 
+    background: #1e1e1e; 
+    padding: 20px; 
+    border-radius: 16px; 
+    width: 100%;       
+    max-width: 440px; 
+    border: 1px solid #333;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.45); 
+    overflow: hidden;  
+  }
+
+  .page-section { display: none; }
+  .page-section.active { display: block; }
+
+  h1 { font-size: 1.2rem; color: #ff9800; text-align: center; margin: 0 0 15px; }
+
+  .calculator button:active,
+  .record-card button:active { 
+    filter: brightness(0.75) !important; 
+    transform: scale(0.95) !important; 
+    transition: filter 0.05s, transform 0.05s !important;
+  }
+
+  input[type="text"] { 
+    width: 100%; 
+    padding: 10px; 
+    background: #252525; 
+    border: 1px solid #444; 
+    border-radius: 8px; 
+    color: #fff; 
+    outline: none; 
+    font-size: 0.85rem;
+  }
+
+  .ctrl-btn { 
+    flex: 1; 
+    border: none; 
+    padding: 10px 4px; 
+    border-radius: 8px; 
+    font-weight: bold; 
+    cursor: pointer; 
+    font-size: 0.82rem;
+    white-space: nowrap;
+    transition: background 0.2s, color 0.2s;
+  }
+
+  .btn-zero-style { background: #e65c00; color: #ffffff; }
+  .btn-zero-style:hover { background: #cf5300; }
+
+  .btn-gmeter-recording { background: #e74c3c !important; color: #fff !important; }
+  .btn-gmeter-idle { background: #ff9800; color: #121212; }
+
+  .btn-gps-recording { background: #e74c3c !important; color: #fff !important; }
+  .btn-gps-idle { background: #00bcd4; color: #121212; }
+
+  .speed-compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .speed-card {
+    background: #181818;
+    border: 1px solid #2a2a2a;
+    border-radius: 10px;
+    padding: 10px 5px;
+    text-align: center;
+  }
+
+  .speed-card-title { font-size: 0.75rem; color: #888; margin-bottom: 4px; font-weight: 600; }
+  .speed-val-lg { font-size: 2rem; font-weight: 800; line-height: 1.1; }
+
+  .gmeter-color { color: #ff9800; }
+  .gps-color { color: #00bcd4; }
+  .unit { font-size: 0.75rem; color: #666; margin-left: 2px; }
+
+  .result-box { 
+    background: #121212; 
+    padding: 14px; 
+    border-radius: 12px; 
+    text-align: center; 
+    margin: 12px 0; 
+    border: 1px solid #222; 
+  }
+  
+  .distance-compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px dashed #333;
+  }
+
+  .distance-item {
+    background: #181818;
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid #2a2a2a;
+  }
+
+  .distance-title { font-size: 0.7rem; color: #888; margin-bottom: 3px; }
+  .distance-val { font-size: 0.95rem; font-weight: 700; }
+
+  .info { font-size: 0.8rem; color: #aaa; margin-top: 4px; }
+  .axis-title { color: #888; font-weight: 600; }
+
+  .btn-row { 
+    display: grid; 
+    grid-template-columns: 1fr 1fr; 
+    gap: 8px;                       
+    margin: 10px 0; 
+  }
+
+  .reset-btn { 
+    background: #333; 
+    color: #999; 
+    border: 1px solid #444; 
+    border-radius: 8px; 
+    font-size: 0.82rem;
+    font-weight: bold;
+    cursor: pointer;
+  }
+
+  .helper-box {
+    background: #2a2a2a;
+    padding: 14px;
+    border-radius: 12px;
+    margin-bottom: 15px;
+    border: 1px dashed #555;
+  }
+
+  .helper-label {
+    color: #ff9800;
+    font-weight: bold;
+    display: block;
+    margin-bottom: 12px;
+    font-size: 0.85rem;
+  }
+
+  .helper-inputs {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-bottom: 10px;
+    margin-top: 6px;
+  }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 8px;
+    border-radius: 4px;
+    background: linear-gradient(to right, #007aff 0%, #007aff 65%, #e0e0e0 65%, #e0e0e0 100%);
+    outline: none;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #007aff;
+    cursor: pointer;
+  }
+
+  .btn-fill {
+    flex: 1;
+    padding: 10px;
+    background: transparent;
+    color: #ff9800;
+    border: 1.5px solid #ff9800;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 0.85rem;
+    text-align: center;
+  }
+
+  /* 模式切換按鈕樣式 */
+  .btn-mode-unselected {
+    background: transparent;
+    color: #aaa;
+    border: 1.5px solid #555;
+  }
+
+  .btn-mode-selected {
+    background: #ff9800 !important;
+    color: #121212 !important;
+    border: 1.5px solid #ff9800 !important;
+  }
+
+  /* --- v-t 圖表區塊 --- */
+  .graph-container {
+    margin: 15px 0;
+    width: 100%;
+    height: 250px;
+    position: relative;
+    box-sizing: border-box;
+    touch-action: none;
+    overflow: hidden;
+    border-radius: 12px;
+  }
+
+  .vtGraphClass {
+    background-color: #121212; 
+    border: 1px solid #333333; 
+    border-radius: 12px;        
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35); 
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .graph-placeholder {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    pointer-events: none;
+    background-image: radial-gradient(#333333 1px, transparent 1px);
+    background-size: 16px 16px;
+    background-position: center;
+    border-radius: 12px; color: #aaaaaa; font-size: 0.82rem; font-weight: 600;
+    background-color: #1e1e1e; opacity: 0.95; padding: 8px 16px;
+    border: 1px solid #333333;
+    transition: opacity 0.3s ease; z-index: 5;
+  }
+
+  .graph-container.has-data .graph-placeholder { opacity: 0; }
+
+  .graph-grid line { stroke: #282828; stroke-width: 1; stroke-dasharray: 3, 3; }
+  .graph-grid line.axis-line { stroke: #555555; stroke-width: 1.5; stroke-dasharray: none; }
+
+  /* 積分速度線 (橘) 與 GPS 速度線 (青藍) */
+  .vt-line-path { fill: none; stroke: #ff9800; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+  .vt-gps-line-path { fill: none; stroke: #00bcd4; stroke-width: 2.0; stroke-linecap: round; stroke-linejoin: round; }
+  .vt-area-path { fill: #ff9800; fill-opacity: 0.12; stroke: none; }
+
+  .graph-labels text { fill: #a0aec0; font-size: 10px; font-family: monospace !important; user-select: none; }
+  .graph-labels text.axis-title { fill: #ff9800; font-weight: bold; font-size: 11px; }
+
+  .btn-reset-zoom {
+    position: absolute; top: 10px; right: 10px;
+    background: rgba(30, 30, 30, 0.85); color: #ff9800;
+    border: 1px solid #ff9800; padding: 4px 8px; border-radius: 6px;
+    font-size: 0.7rem; font-weight: bold; cursor: pointer; z-index: 10; display: none;
+  }
+
+  /* 互動提示層 (Tooltip & Guide Line) */
+  .interactive-guideline { stroke: #ff9800; stroke-width: 1; stroke-dasharray: 4, 4; opacity: 0.7; }
+  .interactive-focus-point { fill: #ff9800; stroke: #ffffff; stroke-width: 2; }
+  .interactive-gps-focus-point { fill: #00bcd4; stroke: #ffffff; stroke-width: 2; }
+  .interactive-tooltip-bg { fill: rgba(20, 20, 20, 0.94); stroke: #ff9800; stroke-width: 1; rx: 6; ry: 6; }
+  .interactive-tooltip-text { fill: #ffffff; font-size: 10px; font-family: monospace !important; font-weight: bold; }
+
+  /* --- 歷史紀錄表格樣式 --- */
+  .category-title { color: #fff !important; font-size: 0.95rem; font-weight: 800; }
+
+  .page-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 15px;
+  }
+
+  .btn-back-nav {
+    background: #2a2a2a;
+    color: #ff9800;
+    border: 1px solid #ff9800;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+  }
+
+  .record-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 12px; border-bottom: 1px solid #333; padding-bottom: 8px;
+  }
+
+  .header-actions { display: flex; gap: 6px; }
+
+  .btn-action {
+    padding: 5px 10px; font-size: 11px; font-weight: bold;
+    border: none; border-radius: 6px; cursor: pointer; white-space: nowrap;
+  }
+
+  .btn-export-csv { background-color: #27ae60 !important; color: white !important; }
+  .btn-clear-all { background-color: #e74c3c !important; color: white !important; }
+
+  .record-table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 6px; }
+  .record-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 11px; white-space: nowrap; }
+  .record-table th { padding: 8px 4px; border-bottom: 2px solid #333; color: #888; font-weight: 500; }
+  .record-table td { padding: 8px 4px; vertical-align: middle; }
+  .record-row { transition: background 0.2s; }
+  .record-row:hover { background: #252525; }
+  .record-data-cell { font-family: 'Noto Sans Mono', monospace !important; font-weight: 700; }
+
+  .record-badge { padding: 2px 4px; border-radius: 4px; font-size: 10px; font-weight: 500; display: inline-block; }
+  .badge-gmeter { background-color: rgba(255, 152, 0, 0.15); color: #ff9800; }
+  .badge-gps { background-color: rgba(0, 188, 212, 0.15); color: #00bcd4; }
+  .badge-none { background-color: rgba(120, 120, 120, 0.15); color: #777; }
+
+  .btn-delete { background: #442222; color: #ff6666; border: 1px solid #663333; padding: 3px 6px; border-radius: 4px; cursor: pointer; font-size: 0.7rem; }
+  .btn-mini-csv { background: #1b4332; color: #2ecc71; border: 1px solid #27ae60; padding: 2px 6px; border-radius: 4px; cursor: pointer; font-size: 0.68rem; font-weight: bold; }
+  .btn-mini-vt { background: #3d2b00; color: #ff9800; border: 1px solid #ff9800; padding: 2px 6px; border-radius: 4px; cursor: pointer; font-size: 0.68rem; font-weight: bold; }
+
+  .btn-go-page2 {
+    width: 100%; margin-top: 10px; padding: 10px;
+    background: #252525; color: #ff9800; border: 1px solid #444;
+    border-radius: 8px; font-size: 0.85rem; font-weight: bold; cursor: pointer;
+  }
+
+  .pagination-container { display: flex; justify-content: center; align-items: center; gap: 12px; margin-top: 12px; }
+  .btn-page { background: #2a2a2a; color: #ff9800; border: 1px solid #ff9800; padding: 3px 10px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.8rem; }
+  .btn-page:disabled { border-color: #444; color: #555; cursor: not-allowed; }
+  .page-info { font-size: 0.8rem; color: #aaa; }
+
+  .status-tag { font-size: 0.72rem; padding: 3px 6px; border-radius: 4px; display: inline-block; }
+  .status-active { background: rgba(46, 204, 113, 0.2); color: #2ecc71; border: 1px solid #2ecc71; }
+  .status-inactive { background: rgba(231, 76, 60, 0.2); color: #e74c3c; border: 1px solid #e74c3c; }
+  .status-gps { background: rgba(0, 188, 212, 0.2); color: #00bcd4; border: 1px solid #00bcd4; }
+  .placeholder-text { color: #555; text-align: center; font-size: 0.8rem; padding: 15px 0; }
+  </style>
+</head>
+<body>
+
+<div class="calculator">
+
+  <!-- ================= 第一頁：測量器主畫面 ================= -->
+  <div id="page-1" class="page-section active">
+    <h1>加速度積分 與 GPS 測速器 canary 5.0</h1>
+
+    <div id="permission-btn-container" style="margin-bottom: 8px; display: flex; gap: 8px;">
+      <button id="btn-request-permission" class="btn-fill">啟動動態感測器</button>
+      <button id="btn-request-gps" class="btn-fill" style="color: #00bcd4; border-color: #00bcd4;">開啟 GPS 定位</button>
+    </div>
+
+    <!-- 模式切換按鈕列 (與上方同樣式排版) -->
+    <div id="mode-btn-container" style="margin-bottom: 12px; display: flex; gap: 8px;">
+      <button id="btn-mode-other" class="btn-fill btn-mode-selected">一般模式</button>
+      <button id="btn-mode-railway" class="btn-fill btn-mode-unselected">鐵路模式</button>
+    </div>
+
+    <div style="text-align: center; margin-bottom: 10px; display: flex; flex-direction: column; gap: 4px; align-items: center;">
+      <span id="calib-status" class="status-tag status-inactive">未校準 (靜止時按矯正歸零)</span>
+      <span id="gps-status" class="status-tag status-inactive">GPS 定位：未啟動</span>
+    </div>
+
+    <!-- 速度雙卡片 -->
+    <div class="speed-compare-grid">
+      <div class="speed-card">
+        <div class="speed-card-title">積分速度</div>
+        <div class="speed-val-lg gmeter-color"><span id="speed-val">0.0</span><span class="unit">km/h</span></div>
+      </div>
+      <div class="speed-card">
+        <div class="speed-card-title">GPS 速度</div>
+        <div class="speed-val-lg gps-color"><span id="gps-speed-val">0.0</span><span class="unit">km/h</span></div>
+      </div>
+    </div>
+
+    <!-- 數據顯示面板 -->
+    <div class="result-box">
+      <div class="distance-compare-grid">
+        <div class="distance-item">
+          <div class="distance-title">積分位移</div>
+          <div class="distance-val gmeter-color"><span id="dist-val">0.0</span> <span id="dist-unit" style="font-size:0.7rem">m</span></div>
+        </div>
+        <div class="distance-item">
+          <div class="distance-title">GPS 位移</div>
+          <div class="distance-val gps-color"><span id="gps-dist-val">0.0</span> <span id="gps-dist-unit" style="font-size:0.7rem">m</span></div>
+        </div>
+      </div>
+
+      <div class="info">
+        <span class="axis-title">X-axis (左右)：</span>
+        <span id="accel-x-val" style="color: #2ecc71; font-weight: bold;">0.000</span> m/s² 
+        (<span id="g-x-val">0.000</span> G)
+      </div>
+      
+      <div class="info">
+        <span class="axis-title">Y-axis (淨推進)：</span>
+        <span id="accel-val" style="color: #ff9800; font-weight: bold;">0.000</span> m/s² 
+        (<span id="g-val">0.000</span> G)
+      </div>
+
+      <div class="info" style="font-size: 0.72rem; color: #666; margin-top: 8px; border-top: 1px dashed #333; padding-top: 6px;">
+        測量時長：<span id="timer-val">0.0</span> s 
+        <div class="info" style="font-size: 0.72rem; color: #666; margin-top: 6px;">
+          積分極速：<span id="max-speed-val">0.0</span> km/h | GPS 極速：<span id="gps-max-speed-val">0.0</span> km/h
+        </div>
+        <div class="info" style="font-size: 0.72rem; color: #666; margin-top: 6px; border-top: 1px dashed #222; padding-top: 4px;">
+          最大加速度：<span id="max-accel-val">0.000</span> m/s² | 最大減速度：<span id="max-decel-val">0.000</span> m/s²
+        </div>
+      </div>
+    </div>
+
+    <!-- 控制按鈕列 -->
+    <div class="btn-row">
+      <button id="btn-zero" class="ctrl-btn btn-zero-style">矯正歸零</button>
+      <button id="btn-reset" class="reset-btn">重置</button>
+      <button id="btn-toggle-accel" class="ctrl-btn btn-gmeter-idle">錄製積分</button>
+      <button id="btn-toggle-gps" class="ctrl-btn btn-gps-idle">錄製 GPS</button>
+    </div>
+
+    <!-- 參數與偏置面板 -->
+    <div class="helper-box">
+      <span class="helper-label">平滑低通濾波設定</span>
+
+      <label for="lpf-slider" style="font-size: 0.78rem; color: #aaa;">低通濾波強度 (Smoothing Alpha: <span id="lpf-val">0.20</span>)</label>
+      <div class="helper-inputs">
+        <input type="range" id="lpf-slider" min="0.01" max="0.30" step="0.01" value="0.20">
+      </div>
+
+      <label style="font-size: 0.78rem; color: #aaa;">Y 軸校準零點偏置 (Bias Offset):</label>
+      <div class="helper-inputs" style="margin-top: 4px; margin-bottom: 0;">
+        <input type="text" id="bias-display-y" value="0.0000 m/s²" readonly>
+      </div>
+    </div>
+
+    <!-- 第一頁：即時 v-t 圖表 (包含積分與 GPS 雙曲線) -->
+    <div class="graph-container" id="p1-vtContainer">
+      <button id="p1-btnResetZoom" class="btn-reset-zoom">重置縮放</button>
+      <div class="graph-placeholder" id="p1-vtPlaceholder">
+        開始錄製後將繪製 v-t 曲線圖
+      </div>
+      <svg id="p1-vtGraph" class="vtGraphClass" viewBox="0 0 500 280" preserveAspectRatio="none">
+        <g id="p1-vtZoomGroup">
+          <g id="p1-vtGrid" class="graph-grid"></g>
+          <path id="p1-vtArea" class="vt-area-path" d="" />
+          <path id="p1-vtLine" class="vt-line-path" d="" />
+          <path id="p1-vtGpsLine" class="vt-gps-line-path" d="" />
+        </g>
+        <g id="p1-vtZoomLabels" class="graph-labels"></g>
+        <g id="p1-vtFixedLabels" class="graph-labels"></g>
+        <g id="p1-vtInteractive" style="display: none; pointer-events: none;">
+          <line id="p1-vtGuideLine" class="interactive-guideline" x1="0" y1="25" x2="0" y2="240" />
+          <circle id="p1-vtFocusPoint" class="interactive-focus-point" r="5" />
+          <circle id="p1-vtGpsFocusPoint" class="interactive-gps-focus-point" r="4" />
+          <rect id="p1-vtTooltipBg" class="interactive-tooltip-bg" x="0" y="0" width="135" height="54" />
+          <text id="p1-vtTooltipTime" class="interactive-tooltip-text" x="0" y="0">00:00.0</text>
+          <text id="p1-vtTooltipSpeed" class="interactive-tooltip-text" x="0" y="0" fill="#ff9800">積分 0.0 km/h</text>
+          <text id="p1-vtTooltipGpsSpeed" class="interactive-tooltip-text" x="0" y="0" fill="#00bcd4">GPS 0.0 km/h</text>
+        </g>
+      </svg>
+    </div>
+
+    <!-- 第一頁：最近 5 筆紀錄簡表 -->
+    <div style="margin-top: 15px;">
+      <h3 class="category-title" style="margin-bottom: 8px;">最近觀測紀錄</h3>
+      <div class="record-table-wrapper">
+        <table class="record-table">
+          <thead>
+            <tr>
+              <th>時間</th>
+              <th>積分極速</th>
+              <th>GPS極速</th>
+              <th>時長</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="p1-records-tbody">
+            <tr><td colspan="5" class="placeholder-text">尚無觀測紀錄</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <button id="btn-go-page2" class="btn-go-page2">查看完整觀測紀錄</button>
+    </div>
+  </div>
+
+
+  <!-- ================= 第二頁：全面性紀錄專區 ================= -->
+  <div id="page-2" class="page-section">
+    <div class="page-header-row">
+      <button id="btn-back-p1" class="btn-back-nav">←</button>
+      <h2 style="font-size: 1.1rem; color: #ff9800; margin: 0; font-weight: 800;">觀測紀錄</h2>
+      <div style="width: 32px;"></div>
+    </div>
+
+    <!-- 最上方 v-t 圖表渲染位置 -->
+    <div class="graph-container" id="p2-vtContainer">
+      <button id="p2-btnResetZoom" class="btn-reset-zoom">重置縮放</button>
+      <div class="graph-placeholder" id="p2-vtPlaceholder">
+        點擊下方紀錄列的「v-t圖」重現曲線圖
+      </div>
+      <svg id="p2-vtGraph" class="vtGraphClass" viewBox="0 0 500 280" preserveAspectRatio="none">
+        <g id="p2-vtZoomGroup">
+          <g id="p2-vtGrid" class="graph-grid"></g>
+          <path id="p2-vtArea" class="vt-area-path" d="" />
+          <path id="p2-vtLine" class="vt-line-path" d="" />
+          <path id="p2-vtGpsLine" class="vt-gps-line-path" d="" />
+        </g>
+        <g id="p2-vtZoomLabels" class="graph-labels"></g>
+        <g id="p2-vtFixedLabels" class="graph-labels"></g>
+        <g id="p2-vtInteractive" style="display: none; pointer-events: none;">
+          <line id="p2-vtGuideLine" class="interactive-guideline" x1="0" y1="25" x2="0" y2="240" />
+          <circle id="p2-vtFocusPoint" class="interactive-focus-point" r="5" />
+          <circle id="p2-vtGpsFocusPoint" class="interactive-gps-focus-point" r="4" />
+          <rect id="p2-vtTooltipBg" class="interactive-tooltip-bg" x="0" y="0" width="135" height="54" />
+          <text id="p2-vtTooltipTime" class="interactive-tooltip-text" x="0" y="0">00:00.0</text>
+          <text id="p2-vtTooltipSpeed" class="interactive-tooltip-text" x="0" y="0" fill="#ff9800">積分 0.0 km/h</text>
+          <text id="p2-vtTooltipGpsSpeed" class="interactive-tooltip-text" x="0" y="0" fill="#00bcd4">GPS 0.0 km/h</text>
+        </g>
+      </svg>
+    </div>
+
+    <!-- 第二頁：全面性紀錄表格 -->
+    <div class="record-card" style="margin-top: 10px;">
+      <div class="record-header">
+        <span style="font-size: 0.8rem; color: #aaa;">詳細數據對照表</span>
+        <div class="header-actions">
+          <button id="btn-export-csv" class="btn-action btn-export-csv">匯出總 CSV</button>
+          <button id="btn-clear-history" class="btn-action btn-clear-all">清空紀錄</button>
+        </div>
+      </div>
+
+      <div class="record-table-wrapper">
+        <table class="record-table">
+          <thead>
+            <tr>
+              <th>速度csv</th>
+              <th>積分極速</th>
+              <th>GPS極速</th>
+              <th>積分位移</th>
+              <th>GPS位移</th>
+              <th>時長</th>
+              <th>v-t圖</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="p2-records-tbody">
+            <tr><td colspan="8" class="placeholder-text">尚無觀測紀錄</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pagination-container">
+        <button id="btn-prev-page" class="btn-page" disabled>上一頁</button>
+        <span id="page-info" class="page-info">第 1 / 1 頁</span>
+        <button id="btn-next-page" class="btn-page" disabled>下一頁</button>
+      </div>
+    </div>
+  </div>
+
+  <div style="text-align: center; font-size: 0.75rem; color: #555; margin-top: 15px;">
+    longhorn 5.0
+  </div>
+</div>
+
+<script>
+// --- 平台自動偵測 (iOS 判斷) ---
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+              (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const axisMultiplier = isIOS ? -1.0 : 1.0;
+
+// --- 螢幕恆亮 Wake Lock 管理 ---
+let wakeLock = null;
+async function requestWakeLock() {
+  if ('wakeLock' in navigator) {
+    try { wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
+  }
+}
+async function releaseWakeLock() {
+  if (wakeLock !== null) {
+    try { await wakeLock.release(); wakeLock = null; } catch (err) {}
+  }
+}
+
+// --- 變數定義 ---
+let isAccelRecording = false, isGpsRecording = false, isCalibrated = false, isRailwayMode = false;
+let xOffset = 0.0, yOffset = 0.0;
+let currentRawX = 0.0, currentRawY = 0.0, filteredX = 0.0, filteredY = 0.0;
+let currentSpeed = 0.0, maxSpeedKmh = 0.0, totalDisplacement = 0.0;
+let maxAccelVal = 0.0, maxDecelVal = 0.0;
+
+let gpsWatchId = null;
+let currentGpsSpeedMps = -1.0, currentGpsSpeedKmh = 0.0, maxGpsSpeedKmh = 0.0;
+let totalGpsDisplacement = 0.0, currentGpsAccuracy = 999.0, lastGpsUpdateTime = 0;
+let lastLat = null, lastLon = null;
+
+let lastAccelTimestamp = null, lastPointPushTime = 0, recordingStartTime = null, totalRecordedTime = 0.0, timerInterval = null; 
+let lpfAlpha = 0.20; 
+let vtPointsData = [];
+let p2ActivePointsData = [];
+
+// 圖表縮放與平移狀態管理
+const graphStates = {
+  p1: { zoomScale: 1.0, panTranslateX: 0.0, initialPinchDistance: null, initialScale: 1.0, isDragging: false, startDragX: 0, startPanX: 0 },
+  p2: { zoomScale: 1.0, panTranslateX: 0.0, initialPinchDistance: null, initialScale: 1.0, isDragging: false, startDragX: 0, startPanX: 0 }
+};
+
+// localStorage 讀取 (canary 5.0)
+let records = [];
+try {
+  const savedRecords = localStorage.getItem('speedometer_records_canary50');
+  if (savedRecords) records = JSON.parse(savedRecords);
+} catch (e) {}
+
+let currentPage = 1;
+const rowsPerPage = 5;
+
+// DOM 元素
+const page1 = document.getElementById('page-1');
+const page2 = document.getElementById('page-2');
+const btnGoPage2 = document.getElementById('btn-go-page2');
+const btnBackP1 = document.getElementById('btn-back-p1');
+
+const btnModeOther = document.getElementById('btn-mode-other');
+const btnModeRailway = document.getElementById('btn-mode-railway');
+
+const speedValEl = document.getElementById('speed-val');
+const gpsSpeedValEl = document.getElementById('gps-speed-val');
+const distValEl = document.getElementById('dist-val');
+const distUnitEl = document.getElementById('dist-unit');
+const gpsDistValEl = document.getElementById('gps-dist-val');
+const gpsDistUnitEl = document.getElementById('gps-dist-unit');
+const accelValEl = document.getElementById('accel-val');
+const gValEl = document.getElementById('g-val');
+const accelXValEl = document.getElementById('accel-x-val');
+const gXValEl = document.getElementById('g-x-val');
+
+const timerValEl = document.getElementById('timer-val');
+const maxSpeedValEl = document.getElementById('max-speed-val');
+const gpsMaxSpeedValEl = document.getElementById('gps-max-speed-val');
+const maxAccelValEl = document.getElementById('max-accel-val');
+const maxDecelValEl = document.getElementById('max-decel-val');
+
+const calibStatusEl = document.getElementById('calib-status');
+const gpsStatusEl = document.getElementById('gps-status');
+const biasDisplayYEl = document.getElementById('bias-display-y');
+
+const btnZero = document.getElementById('btn-zero');
+const btnToggleAccel = document.getElementById('btn-toggle-accel');
+const btnToggleGps = document.getElementById('btn-toggle-gps');
+const btnReset = document.getElementById('btn-reset');
+const lpfSlider = document.getElementById('lpf-slider');
+const lpfValEl = document.getElementById('lpf-val');
+
+const p1RecordsTbody = document.getElementById('p1-records-tbody');
+const p2RecordsTbody = document.getElementById('p2-records-tbody');
+const btnExportCsv = document.getElementById('btn-export-csv');
+const btnClearHistory = document.getElementById('btn-clear-history');
+const btnPrevPage = document.getElementById('btn-prev-page');
+const btnNextPage = document.getElementById('btn-next-page');
+const pageInfoEl = document.getElementById('page-info');
+
+// 模式切換按鈕事件綁定
+btnModeOther.addEventListener('click', () => {
+  isRailwayMode = false;
+  btnModeOther.className = "btn-fill btn-mode-selected";
+  btnModeRailway.className = "btn-fill btn-mode-unselected";
+});
+
+btnModeRailway.addEventListener('click', () => {
+  isRailwayMode = true;
+  btnModeRailway.className = "btn-fill btn-mode-selected";
+  btnModeOther.className = "btn-fill btn-mode-unselected";
+});
+
+// 頁面切換控制
+btnGoPage2.addEventListener('click', () => {
+  page1.classList.remove('active');
+  page2.classList.add('active');
+  renderP2Records();
+});
+
+btnBackP1.addEventListener('click', () => {
+  page2.classList.remove('active');
+  page1.classList.add('active');
+  renderP1Records();
+});
+
+// 感測器權限與啟動
+document.getElementById('btn-request-permission').addEventListener('click', () => {
+  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+    DeviceMotionEvent.requestPermission().then(state => {
+      if (state === 'granted') { initSensorListener(); document.getElementById('btn-request-permission').style.display = 'none'; }
+    });
+  } else {
+    initSensorListener(); document.getElementById('btn-request-permission').style.display = 'none';
+  }
+});
+
+document.getElementById('btn-request-gps').addEventListener('click', () => { initGpsListener(); });
+
+// 感測器監聽 (包含鐵路模式智慧運算過濾)
+function initSensorListener() {
+  window.addEventListener('devicemotion', (event) => {
+    if (!event.accelerationIncludingGravity) return;
+    
+    currentRawX = (event.accelerationIncludingGravity.x || 0.0) * axisMultiplier;
+    currentRawY = (event.accelerationIncludingGravity.y || 0.0) * axisMultiplier;
+
+    filteredX = filteredX + lpfAlpha * (currentRawX - filteredX);
+    filteredY = filteredY + lpfAlpha * (currentRawY - filteredY);
+
+    let cleanAccelX = filteredX - xOffset;
+    let cleanAccelY = filteredY - yOffset;
+    if (Math.abs(cleanAccelY) < 0.008) cleanAccelY = 0.0;
+
+    // 鐵路模式邏輯處理
+    if (isRailwayMode) {
+      let currentSpeedKmh = currentSpeed * 3.6;
+      if (currentSpeedKmh > 8.0 && Math.abs(cleanAccelY) < 0.05) {
+        cleanAccelY = 0.0;
+      }
+    }
+
+    accelValEl.textContent = cleanAccelY.toFixed(3);
+    gValEl.textContent = (cleanAccelY / 9.80665).toFixed(3);
+    accelXValEl.textContent = cleanAccelX.toFixed(3);
+    gXValEl.textContent = (cleanAccelX / 9.80665).toFixed(3);
+
+    const now = performance.now();
+
+    if (isAccelRecording || isGpsRecording) {
+      if (cleanAccelY > maxAccelVal) { maxAccelVal = cleanAccelY; maxAccelValEl.textContent = maxAccelVal.toFixed(3); }
+      if (cleanAccelY < 0) {
+        let decelMag = Math.abs(cleanAccelY);
+        if (decelMag > maxDecelVal) { maxDecelVal = decelMag; maxDecelValEl.textContent = maxDecelVal.toFixed(3); }
+      }
+
+      if (lastAccelTimestamp !== null) {
+        let dt = (now - lastAccelTimestamp) / 1000.0; 
+        if (dt > 0 && dt < 0.5) { 
+          if (isAccelRecording) {
+            currentSpeed += cleanAccelY * dt;
+            if (currentSpeed < 0) currentSpeed = 0.0; 
+            totalDisplacement += currentSpeed * dt;
+
+            let speedKmh = currentSpeed * 3.6;
+            speedValEl.textContent = speedKmh.toFixed(1);
+
+            if (speedKmh > maxSpeedKmh) {
+              maxSpeedKmh = speedKmh;
+              maxSpeedValEl.textContent = maxSpeedKmh.toFixed(1);
+            }
+
+            if (totalDisplacement >= 1000) {
+              distValEl.textContent = (totalDisplacement / 1000).toFixed(2);
+              distUnitEl.textContent = "km";
+            } else {
+              distValEl.textContent = totalDisplacement.toFixed(1);
+              distUnitEl.textContent = "m";
+            }
+          }
+
+          if (now - lastPointPushTime > 50) {
+            let activeAccelKmh = isAccelRecording ? (currentSpeed * 3.6) : 0.0;
+            let activeGpsKmh = (isGpsRecording && (now - lastGpsUpdateTime < 3000) && currentGpsSpeedKmh >= 0) ? currentGpsSpeedKmh : 0.0;
+
+            vtPointsData.push({ 
+              t: totalRecordedTime, 
+              v: activeAccelKmh, 
+              gv: activeGpsKmh 
+            });
+
+            drawGraphToElement('p1', vtPointsData);
+            lastPointPushTime = now;
+          }
+        }
+      }
+      lastAccelTimestamp = now;
+    }
+  });
+}
+
+// GPS 功能
+function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371e3;
+  const dLat = (lat2 - lat1) * Math.PI / 180, dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+
+function initGpsListener() {
+  if (!("geolocation" in navigator)) return;
+  gpsStatusEl.className = "status-tag status-gps";
+  gpsStatusEl.textContent = "GPS 定位：搜尋中...";
+
+  gpsWatchId = navigator.geolocation.watchPosition(
+    (position) => {
+      const speedMps = position.coords.speed, accuracy = position.coords.accuracy;
+      const lat = position.coords.latitude, lon = position.coords.longitude;
+      currentGpsAccuracy = accuracy || 999;
+
+      if (speedMps !== null && !isNaN(speedMps) && speedMps >= 0) {
+        currentGpsSpeedMps = speedMps;
+        currentGpsSpeedKmh = speedMps * 3.6;
+        lastGpsUpdateTime = performance.now();
+        gpsSpeedValEl.textContent = currentGpsSpeedKmh.toFixed(1);
+
+        if (isGpsRecording && currentGpsSpeedKmh > maxGpsSpeedKmh) {
+          maxGpsSpeedKmh = currentGpsSpeedKmh;
+          gpsMaxSpeedValEl.textContent = maxGpsSpeedKmh.toFixed(1);
+        }
+      } else {
+        gpsSpeedValEl.textContent = "0.0";
+        currentGpsSpeedMps = -1.0;
+      }
+
+      if (lastLat !== null && lastLon !== null && accuracy < 35) {
+        let distDelta = calculateHaversineDistance(lastLat, lastLon, lat, lon);
+        if (distDelta > 0.8 && distDelta < 100 && isGpsRecording) totalGpsDisplacement += distDelta;
+      }
+      lastLat = lat; lastLon = lon;
+
+      if (totalGpsDisplacement >= 1000) {
+        gpsDistValEl.textContent = (totalGpsDisplacement / 1000).toFixed(2);
+        gpsDistUnitEl.textContent = "km";
+      } else {
+        gpsDistValEl.textContent = totalGpsDisplacement.toFixed(1);
+        gpsDistUnitEl.textContent = "m";
+      }
+
+      gpsStatusEl.className = "status-tag status-gps";
+      gpsStatusEl.textContent = `GPS 定位：良好 (±${Math.round(accuracy)}m)`;
+    },
+    () => { gpsStatusEl.className = "status-tag status-inactive"; gpsStatusEl.textContent = "GPS 定位：微弱"; },
+    { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
+  );
+}
+
+// 應用 transform 矩陣轉換與更新刻度
+function applyZoomTransform(prefix) {
+  const st = graphStates[prefix];
+  const zoomGroup = document.getElementById(`${prefix}-vtZoomGroup`);
+  const btnReset = document.getElementById(`${prefix}-btnResetZoom`);
+  const zoomLabelsEl = document.getElementById(`${prefix}-vtZoomLabels`);
+
+  zoomGroup.setAttribute('transform', `translate(${st.panTranslateX}, 0) scale(${st.zoomScale}, 1)`);
+
+  if (st.zoomScale > 1.05 || Math.abs(st.panTranslateX) > 1) {
+    if (btnReset) btnReset.style.display = "block";
+  } else {
+    if (btnReset) btnReset.style.display = "none";
+  }
+
+  const points = prefix === 'p1' ? vtPointsData : p2ActivePointsData;
+  const paddingLeft = 45, paddingRight = 20;
+  const graphWidth = 500 - paddingLeft - paddingRight;
+  const numXTicks = 5;
+  const xStepPx = graphWidth / numXTicks;
+  const maxT = points.length > 1 ? Math.max(points[points.length - 1].t, 5) : 10;
+  const tStep = maxT / numXTicks;
+
+  let zoomLabelsHtml = '';
+  for (let i = 0; i <= numXTicks; i++) {
+    const baseX = paddingLeft + (i * xStepPx);
+    const scaledX = baseX * st.zoomScale + st.panTranslateX;
+    const tValue = (i * tStep).toFixed(1);
+
+    if (scaledX >= paddingLeft - 10 && scaledX <= 500 - paddingRight + 10) {
+      zoomLabelsHtml += `<text x="${scaledX.toFixed(1)}" y="256" text-anchor="middle">${tValue}s</text>`;
+    }
+  }
+  zoomLabelsEl.innerHTML = zoomLabelsHtml;
+}
+
+// 通用繪製 v-t 圖表
+function drawGraphToElement(prefix, points) {
+  const container = document.getElementById(`${prefix}-vtContainer`);
+  const gridEl = document.getElementById(`${prefix}-vtGrid`);
+  const lineEl = document.getElementById(`${prefix}-vtLine`);
+  const gpsLineEl = document.getElementById(`${prefix}-vtGpsLine`);
+  const areaEl = document.getElementById(`${prefix}-vtArea`);
+  const fixedLabelsEl = document.getElementById(`${prefix}-vtFixedLabels`);
+  const interactiveEl = document.getElementById(`${prefix}-vtInteractive`);
+
+  const paddingLeft = 45, paddingRight = 20, paddingTop = 25, paddingBottom = 240;
+  const graphWidth = 500 - paddingLeft - paddingRight, graphHeight = paddingBottom - paddingTop;
+
+  let maxVInPoints = 0;
+  points.forEach(p => { 
+    if (p.v > maxVInPoints) maxVInPoints = p.v; 
+    if (p.gv > maxVInPoints) maxVInPoints = p.gv;
+  });
+
+  const maxV = Math.max(prefix === 'p1' ? Math.max(maxSpeedKmh, maxGpsSpeedKmh) : 0, maxVInPoints, 5); 
+  const maxT = points.length > 1 ? Math.max(points[points.length - 1].t, 5) : 10;
+
+  const numYTicks = 5, vStep = maxV / numYTicks, yStepPx = graphHeight / numYTicks;
+  const numXTicks = 5, xStepPx = graphWidth / numXTicks;
+
+  let gridLines = '';
+  let fixedLabelsHtml = `
+    <text x="${500 - paddingRight}" y="${paddingBottom + 32}" text-anchor="end" class="axis-title">時間 (s)</text>
+    <text x="${paddingLeft - 10}" y="15" text-anchor="start" class="axis-title">速度 (km/h)</text>
+  `;
+
+  for (let i = 0; i <= numYTicks; i++) {
+    const yPx = paddingBottom - (i * yStepPx);
+    const vValue = (i * vStep).toFixed(1);
+    gridLines += `<line x1="${paddingLeft}" y1="${yPx}" x2="${500 - paddingRight}" y2="${yPx}" ${i===0?'class="axis-line"':''} />`;
+    fixedLabelsHtml += `<text x="${paddingLeft - 8}" y="${yPx + 4}" text-anchor="end">${vValue}</text>`;
+  }
+
+  gridLines += `<line x1="${paddingLeft}" y1="${paddingTop}" x2="${paddingLeft}" y2="${paddingBottom}" class="axis-line" />`;
+  for (let i = 1; i <= numXTicks; i++) {
+    const xPx = paddingLeft + (i * xStepPx);
+    gridLines += `<line x1="${xPx}" y1="${paddingTop}" x2="${xPx}" y2="${paddingBottom}" />`;
+  }
+
+  gridEl.innerHTML = gridLines;
+  fixedLabelsHtml.innerHTML = fixedLabelsHtml;
+
+  if (points.length < 2) {
+    container.classList.remove('has-data');
+    lineEl.setAttribute('d', '');
+    gpsLineEl.setAttribute('d', '');
+    areaEl.setAttribute('d', '');
+    if (interactiveEl) interactiveEl.style.display = "none";
+    return;
+  }
+
+  container.classList.add('has-data');
+
+  const svgPoints = points.map(p => ({
+    x: paddingLeft + (p.t / maxT) * graphWidth,
+    y: paddingBottom - (p.v / maxV) * graphHeight,
+    gpsY: paddingBottom - ((p.gv || 0) / maxV) * graphHeight,
+    t: p.t, v: p.v, gv: p.gv || 0
+  }));
+
+  let lineD = `M ${svgPoints[0].x.toFixed(1)} ${svgPoints[0].y.toFixed(1)}`;
+  for (let i = 1; i < svgPoints.length; i++) lineD += ` L ${svgPoints[i].x.toFixed(1)} ${svgPoints[i].y.toFixed(1)}`;
+
+  let gpsLineD = `M ${svgPoints[0].x.toFixed(1)} ${svgPoints[0].gpsY.toFixed(1)}`;
+  for (let i = 1; i < svgPoints.length; i++) gpsLineD += ` L ${svgPoints[i].x.toFixed(1)} ${svgPoints[i].gpsY.toFixed(1)}`;
+
+  const lastP = svgPoints[svgPoints.length - 1], firstP = svgPoints[0];
+  let areaD = `${lineD} L ${lastP.x.toFixed(1)} ${paddingBottom} L ${firstP.x.toFixed(1)} ${paddingBottom} Z`;
+
+  lineEl.setAttribute('d', lineD);
+  gpsLineEl.setAttribute('d', gpsLineD);
+  areaEl.setAttribute('d', areaD);
+
+  applyZoomTransform(prefix);
+}
+
+// 手勢與互動事件初始化
+function initVtGraphInteractivity(prefix) {
+  const container = document.getElementById(`${prefix}-vtContainer`);
+  const graph = document.getElementById(`${prefix}-vtGraph`);
+  const btnReset = document.getElementById(`${prefix}-btnResetZoom`);
+  const interactiveEl = document.getElementById(`${prefix}-vtInteractive`);
+  const guideLine = document.getElementById(`${prefix}-vtGuideLine`);
+  const focusPoint = document.getElementById(`${prefix}-vtFocusPoint`);
+  const gpsFocusPoint = document.getElementById(`${prefix}-vtGpsFocusPoint`);
+  const tooltipBg = document.getElementById(`${prefix}-vtTooltipBg`);
+  const tooltipTime = document.getElementById(`${prefix}-vtTooltipTime`);
+  const tooltipSpeed = document.getElementById(`${prefix}-vtTooltipSpeed`);
+  const tooltipGpsSpeed = document.getElementById(`${prefix}-vtTooltipGpsSpeed`);
+
+  const st = graphStates[prefix];
+
+  const getPinchDistance = (e) => {
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  if (btnReset) {
+    btnReset.addEventListener('click', () => {
+      st.zoomScale = 1.0;
+      st.panTranslateX = 0.0;
+      applyZoomTransform(prefix);
+      if (interactiveEl) interactiveEl.style.display = "none";
+    });
+  }
+
+  container.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 2) {
+      st.initialPinchDistance = getPinchDistance(e);
+      st.initialScale = st.zoomScale;
+      if (interactiveEl) interactiveEl.style.display = "none";
+    } else if (e.touches.length === 1) {
+      if (st.zoomScale > 1.05) {
+        st.isDragging = true;
+        st.startDragX = e.touches[0].clientX;
+        st.startPanX = st.panTranslateX;
+      }
+      handlePointer(e);
+    }
+  }, { passive: true });
+
+  container.addEventListener('touchmove', (e) => {
+    if (e.touches.length === 2 && st.initialPinchDistance) {
+      const currentDistance = getPinchDistance(e);
+      const scaleFactor = currentDistance / st.initialPinchDistance;
+      st.zoomScale = Math.min(Math.max(st.initialScale * scaleFactor, 1.0), 5.0);
+      
+      const maxPan = 0;
+      const minPan = -(500 * (st.zoomScale - 1));
+      if (st.panTranslateX < minPan) st.panTranslateX = minPan;
+      if (st.panTranslateX > maxPan) st.panTranslateX = maxPan;
+
+      applyZoomTransform(prefix);
+    } else if (e.touches.length === 1) {
+      if (st.isDragging) {
+        const deltaX = e.touches[0].clientX - st.startDragX;
+        st.panTranslateX = st.startPanX + deltaX;
+        
+        const minPan = -(500 * (st.zoomScale - 1));
+        if (st.panTranslateX > 0) st.panTranslateX = 0;
+        if (st.panTranslateX < minPan) st.panTranslateX = minPan;
+
+        applyZoomTransform(prefix);
+      }
+      handlePointer(e);
+    }
+  }, { passive: true });
+
+  container.addEventListener('touchend', (e) => {
+    if (e.touches.length < 2) st.initialPinchDistance = null;
+    if (e.touches.length === 0) {
+      st.isDragging = false;
+      if (interactiveEl) interactiveEl.style.display = "none";
+    }
+  });
+
+  const handlePointer = (e) => {
+    const points = prefix === 'p1' ? vtPointsData : p2ActivePointsData;
+    if (points.length < 2) return;
+
+    const rect = graph.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    let mouseX = ((clientX - rect.left) / rect.width) * 500;
+
+    mouseX = (mouseX - st.panTranslateX) / st.zoomScale;
+
+    const paddingLeft = 45, paddingRight = 20, paddingTop = 25, paddingBottom = 240;
+    const graphWidth = 500 - paddingLeft - paddingRight;
+    const graphHeight = paddingBottom - paddingTop;
+
+    let maxVInPoints = 0;
+    points.forEach(p => { 
+      if (p.v > maxVInPoints) maxVInPoints = p.v; 
+      if (p.gv > maxVInPoints) maxVInPoints = p.gv;
+    });
+    const maxV = Math.max(prefix === 'p1' ? Math.max(maxSpeedKmh, maxGpsSpeedKmh) : 0, maxVInPoints, 5);
+    const maxT = Math.max(points[points.length - 1].t, 5);
+
+    let closestPoint = null;
+    let minDistance = Infinity;
+
+    points.forEach(p => {
+      const px = paddingLeft + (p.t / maxT) * graphWidth;
+      const dist = Math.abs(px - mouseX);
+      if (dist < minDistance) {
+        minDistance = dist;
+        closestPoint = {
+          t: p.t,
+          v: p.v,
+          gv: p.gv || 0,
+          x: px,
+          y: paddingBottom - (p.v / maxV) * graphHeight,
+          gpsY: paddingBottom - ((p.gv || 0) / maxV) * graphHeight
+        };
+      }
+    });
+
+    if (!closestPoint) return;
+
+    if (interactiveEl) interactiveEl.style.display = "block";
+
+    const screenX = closestPoint.x * st.zoomScale + st.panTranslateX;
+
+    guideLine.setAttribute('x1', screenX);
+    guideLine.setAttribute('x2', screenX);
+    focusPoint.setAttribute('cx', screenX);
+    focusPoint.setAttribute('cy', closestPoint.y);
+
+    if (gpsFocusPoint) {
+      gpsFocusPoint.setAttribute('cx', screenX);
+      gpsFocusPoint.setAttribute('cy', closestPoint.gpsY);
+    }
+
+    let tooltipX = screenX - 67;
+    if (tooltipX < paddingLeft) tooltipX = paddingLeft;
+    if (tooltipX + 135 > 500 - paddingRight) tooltipX = 500 - paddingRight - 135;
+
+    let tooltipY = Math.min(closestPoint.y, closestPoint.gpsY) - 62;
+    if (tooltipY < 5) tooltipY = Math.max(closestPoint.y, closestPoint.gpsY) + 15;
+
+    tooltipBg.setAttribute('x', tooltipX);
+    tooltipBg.setAttribute('y', tooltipY);
+
+    const mins = Math.floor(closestPoint.t / 60).toString().padStart(2, '0');
+    const secs = (closestPoint.t % 60).toFixed(1).padStart(4, '0');
+
+    tooltipTime.setAttribute('x', tooltipX + 8);
+    tooltipTime.setAttribute('y', tooltipY + 15);
+    tooltipTime.textContent = `${mins}:${secs} (${closestPoint.t.toFixed(1)}s)`;
+
+    tooltipSpeed.setAttribute('x', tooltipX + 8);
+    tooltipSpeed.setAttribute('y', tooltipY + 31);
+    tooltipSpeed.textContent = `積分: ${closestPoint.v.toFixed(1)} km/h`;
+
+    if (tooltipGpsSpeed) {
+      tooltipGpsSpeed.setAttribute('x', tooltipX + 8);
+      tooltipGpsSpeed.setAttribute('y', tooltipY + 46);
+      tooltipGpsSpeed.textContent = `GPS : ${closestPoint.gv.toFixed(1)} km/h`;
+    }
+  };
+
+  graph.addEventListener('mousemove', handlePointer);
+  graph.addEventListener('mouseleave', () => { if (interactiveEl) interactiveEl.style.display = "none"; });
+}
+
+// 計時器
+function updateGlobalTimer() {
+  if (isAccelRecording || isGpsRecording) {
+    if (recordingStartTime !== null) {
+      totalRecordedTime = (performance.now() - recordingStartTime) / 1000.0;
+      timerValEl.textContent = totalRecordedTime.toFixed(1);
+    }
+  }
+}
+
+function startRecordingTimer() {
+  if (timerInterval === null) {
+    recordingStartTime = performance.now();
+    timerInterval = setInterval(updateGlobalTimer, 100);
+  }
+}
+
+async function checkWakeLockState() {
+  if (!isAccelRecording && !isGpsRecording) {
+    if (timerInterval !== null) { clearInterval(timerInterval); timerInterval = null; }
+    await releaseWakeLock();
+  }
+}
+
+function resetZoomState(prefix) {
+  const st = graphStates[prefix];
+  st.zoomScale = 1.0;
+  st.panTranslateX = 0.0;
+  applyZoomTransform(prefix);
+}
+
+// 控制按鈕綁定
+btnZero.addEventListener('click', () => {
+  xOffset = filteredX; yOffset = filteredY; isCalibrated = true;
+  currentSpeed = 0.0; totalDisplacement = 0.0; totalGpsDisplacement = 0.0;
+  maxAccelVal = 0.0; maxDecelVal = 0.0; vtPointsData = [];
+  
+  resetZoomState('p1');
+  document.getElementById('p1-vtContainer').classList.remove('has-data');
+  document.getElementById('p1-vtLine').setAttribute('d', '');
+  document.getElementById('p1-vtGpsLine').setAttribute('d', '');
+  document.getElementById('p1-vtArea').setAttribute('d', '');
+
+  maxAccelValEl.textContent = "0.000"; maxDecelValEl.textContent = "0.000";
+  speedValEl.textContent = "0.0"; distValEl.textContent = "0.0"; distUnitEl.textContent = "m";
+  gpsDistValEl.textContent = "0.0"; gpsDistUnitEl.textContent = "m";
+
+  biasDisplayYEl.value = yOffset.toFixed(4) + " m/s²";
+  calibStatusEl.className = "status-tag status-active";
+  calibStatusEl.textContent = "已完成校準：靜態偏置已鎖定";
+});
+
+btnToggleAccel.addEventListener('click', async () => {
+  if (!isCalibrated && !isAccelRecording) {
+    if (!confirm("⚠️ 尚未執行矯正歸零，建議在車站靜止時按下「矯正歸零」！確定直接開始？")) return;
+  }
+  isAccelRecording = !isAccelRecording;
+  if (isAccelRecording) {
+    btnToggleAccel.textContent = "停止積分"; btnToggleAccel.className = "ctrl-btn btn-gmeter-recording";
+    lastAccelTimestamp = performance.now(); startRecordingTimer(); await requestWakeLock();
+  } else {
+    btnToggleAccel.textContent = "錄製積分"; btnToggleAccel.className = "ctrl-btn btn-gmeter-idle";
+    saveCurrentRecord(true, isGpsRecording); await checkWakeLockState();
+  }
+});
+
+btnToggleGps.addEventListener('click', async () => {
+  if (gpsWatchId === null && !isGpsRecording) initGpsListener();
+  isGpsRecording = !isGpsRecording;
+  if (isGpsRecording) {
+    btnToggleGps.textContent = "停止 GPS"; btnToggleGps.className = "ctrl-btn btn-gps-recording";
+    startRecordingTimer(); await requestWakeLock();
+  } else {
+    btnToggleGps.textContent = "錄製 GPS"; btnToggleGps.className = "ctrl-btn btn-gps-idle";
+    saveCurrentRecord(isAccelRecording, true); await checkWakeLockState();
+  }
+});
+
+function saveCurrentRecord(hasAccel, hasGps) {
+  if (totalRecordedTime > 0.2) {
+    addRecord(maxSpeedKmh, maxGpsSpeedKmh, totalDisplacement, totalGpsDisplacement, totalRecordedTime, hasAccel || maxSpeedKmh > 0, hasGps || maxGpsSpeedKmh > 0, [...vtPointsData]);
+  }
+}
+
+btnReset.addEventListener('click', async () => {
+  if (isAccelRecording || isGpsRecording) saveCurrentRecord(isAccelRecording, isGpsRecording);
+  isAccelRecording = false; isGpsRecording = false;
+  btnToggleAccel.textContent = "錄製積分"; btnToggleAccel.className = "ctrl-btn btn-gmeter-idle";
+  btnToggleGps.textContent = "錄製 GPS"; btnToggleGps.className = "ctrl-btn btn-gps-idle";
+  await releaseWakeLock();
+  if (timerInterval !== null) { clearInterval(timerInterval); timerInterval = null; }
+
+  currentSpeed = 0.0; maxSpeedKmh = 0.0; maxGpsSpeedKmh = 0.0;
+  maxAccelVal = 0.0; maxDecelVal = 0.0; totalDisplacement = 0.0; totalGpsDisplacement = 0.0;
+  totalRecordedTime = 0.0; lastAccelTimestamp = null; recordingStartTime = null; vtPointsData = [];
+
+  resetZoomState('p1');
+  document.getElementById('p1-vtContainer').classList.remove('has-data');
+  document.getElementById('p1-vtLine').setAttribute('d', '');
+  document.getElementById('p1-vtGpsLine').setAttribute('d', '');
+  document.getElementById('p1-vtArea').setAttribute('d', '');
+
+  speedValEl.textContent = "0.0"; gpsSpeedValEl.textContent = "0.0";
+  maxSpeedValEl.textContent = "0.0"; gpsMaxSpeedValEl.textContent = "0.0";
+  maxAccelValEl.textContent = "0.000"; maxDecelValEl.textContent = "0.000";
+  distValEl.textContent = "0.0"; distUnitEl.textContent = "m";
+  gpsDistValEl.textContent = "0.0"; gpsDistUnitEl.textContent = "m";
+  timerValEl.textContent = "0.0";
+});
+
+lpfSlider.addEventListener('input', (e) => {
+  lpfAlpha = parseFloat(e.target.value);
+  lpfValEl.textContent = lpfAlpha.toFixed(2);
+  const min = parseFloat(e.target.min), max = parseFloat(e.target.max), val = parseFloat(e.target.value);
+  e.target.style.background = `linear-gradient(to right, #007aff 0%, #007aff ${((val-min)/(max-min))*100}%, #e0e0e0 ${((val-min)/(max-min))*100}%, #e0e0e0 100%)`;
+});
+
+function addRecord(maxSpeed, maxGpsSpeed, displacement, gpsDisplacement, duration, hasAccelData, hasGpsData, vtPoints) {
+  const timeStr = new Date().toLocaleTimeString('zh-TW', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  let dispStr = hasAccelData ? (displacement >= 1000 ? (displacement / 1000).toFixed(2) + " km" : displacement.toFixed(1) + " m") : "---";
+  let gpsDispStr = hasGpsData ? (gpsDisplacement >= 1000 ? (gpsDisplacement / 1000).toFixed(2) + " km" : gpsDisplacement.toFixed(1) + " m") : "---";
+
+  records.unshift({
+    id: Date.now(), time: timeStr,
+    maxSpeed: hasAccelData ? maxSpeed.toFixed(1) + " km/h" : "N/A",
+    maxGpsSpeed: hasGpsData ? maxGpsSpeed.toFixed(1) + " km/h" : "N/A",
+    disp: dispStr, gpsDisp: gpsDispStr,
+    duration: duration.toFixed(1) + " s",
+    vtPoints: vtPoints || []
+  });
+  
+  saveRecordsToStorage();
+  renderP1Records();
+  if (page2.classList.contains('active')) renderP2Records();
+}
+
+function saveRecordsToStorage() {
+  try { localStorage.setItem('speedometer_records_canary50', JSON.stringify(records)); } catch (e) {}
+}
+
+function renderP1Records() {
+  const top5 = records.slice(0, 5);
+  if (top5.length === 0) {
+    p1RecordsTbody.innerHTML = `<tr><td colspan="5" class="placeholder-text">尚無觀測紀錄</td></tr>`;
+    return;
+  }
+
+  p1RecordsTbody.innerHTML = top5.map(r => `
+    <tr class="record-row">
+      <td>${r.time}</td>
+      <td class="record-data-cell"><span class="record-badge ${r.maxSpeed !== 'N/A' ? 'badge-gmeter' : 'badge-none'}">${r.maxSpeed}</span></td>
+      <td class="record-data-cell"><span class="record-badge ${r.maxGpsSpeed !== 'N/A' ? 'badge-gps' : 'badge-none'}">${r.maxGpsSpeed}</span></td>
+      <td>${r.duration}</td>
+      <td><button class="btn-delete" onclick="deleteRecord(${r.id})">刪除</button></td>
+    </tr>
+  `).join('');
+}
+
+function renderP2Records() {
+  if (records.length === 0) {
+    p2RecordsTbody.innerHTML = `<tr><td colspan="8" class="placeholder-text">尚無觀測紀錄</td></tr>`;
+    btnPrevPage.disabled = true; btnNextPage.disabled = true; pageInfoEl.textContent = `第 1 / 1 頁`;
+    return;
+  }
+
+  const totalPages = Math.ceil(records.length / rowsPerPage);
+  if (currentPage > totalPages) currentPage = totalPages;
+
+  const startIndex = (currentPage - 1) * rowsPerPage;
+  const pageRecords = records.slice(startIndex, startIndex + rowsPerPage);
+
+  p2RecordsTbody.innerHTML = pageRecords.map(r => `
+    <tr class="record-row">
+      <td><button class="btn-mini-csv" onclick="exportSingleCsv(${r.id})">下載 CSV</button></td>
+      <td class="record-data-cell"><span class="record-badge ${r.maxSpeed !== 'N/A' ? 'badge-gmeter' : 'badge-none'}">${r.maxSpeed}</span></td>
+      <td class="record-data-cell"><span class="record-badge ${r.maxGpsSpeed !== 'N/A' ? 'badge-gps' : 'badge-none'}">${r.maxGpsSpeed}</span></td>
+      <td style="color: ${r.disp !== '---' ? '#ff9800' : '#666'}; font-weight: 600;">${r.disp}</td>
+      <td style="color: ${r.gpsDisp !== '---' ? '#00bcd4' : '#666'}; font-weight: 600;">${r.gpsDisp}</td>
+      <td>${r.duration}</td>
+      <td><button class="btn-mini-vt" onclick="loadRecordGraph(${r.id})">繪製 v-t</button></td>
+      <td><button class="btn-delete" onclick="deleteRecord(${r.id})">刪除</button></td>
+    </tr>
+  `).join('');
+
+  pageInfoEl.textContent = `第 ${currentPage} / ${totalPages} 頁`;
+  btnPrevPage.disabled = (currentPage === 1);
+  btnNextPage.disabled = (currentPage === totalPages);
+}
+
+window.loadRecordGraph = function(id) {
+  const target = records.find(r => r.id === id);
+  if (!target || !target.vtPoints || target.vtPoints.length === 0) {
+    alert("該筆紀錄無軌跡點資料！");
+    return;
+  }
+
+  p2ActivePointsData = target.vtPoints;
+  resetZoomState('p2');
+  drawGraphToElement('p2', p2ActivePointsData);
+  document.getElementById('p2-vtContainer').scrollIntoView({ behavior: 'smooth' });
+};
+
+window.exportSingleCsv = function(id) {
+  const target = records.find(r => r.id === id);
+  if (!target || !target.vtPoints || target.vtPoints.length === 0) {
+    alert("該筆紀錄無速度點數據可匯出！");
+    return;
+  }
+
+  let csv = "\uFEFF時間(s),積分速度(km/h),GPS速度(km/h)\n";
+  target.vtPoints.forEach(pt => { 
+    csv += `${pt.t.toFixed(2)},${pt.v.toFixed(2)},${(pt.gv || 0).toFixed(2)}\n`; 
+  });
+
+  downloadCsvBlob(csv, `speed_data_${target.time.replace(/:/g, '-')}.csv`);
+};
+
+window.deleteRecord = function(id) {
+  records = records.filter(r => r.id !== id);
+  saveRecordsToStorage();
+  renderP1Records();
+  if (page2.classList.contains('active')) renderP2Records();
+};
+
+btnClearHistory.addEventListener('click', () => {
+  if (records.length === 0) return;
+  if (confirm("確定要清空所有觀測紀錄嗎？")) {
+    records = []; currentPage = 1;
+    saveRecordsToStorage();
+    renderP1Records();
+    renderP2Records();
+  }
+});
+
+btnExportCsv.addEventListener('click', () => {
+  if (records.length === 0) { alert("尚無歷史紀錄！"); return; }
+  let csv = "\uFEFF時間,積分極速,GPS極速,積分位移,GPS位移,測量時長(s)\n";
+  records.forEach(r => { csv += `"${r.time}","${r.maxSpeed}","${r.maxGpsSpeed}","${r.disp}","${r.gpsDisp}","${r.duration}"\n`; });
+  downloadCsvBlob(csv, `speedometer_records_all.csv`);
+});
+
+function downloadCsvBlob(content, filename) {
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+btnPrevPage.addEventListener('click', () => { if (currentPage > 1) { currentPage--; renderP2Records(); } });
+btnNextPage.addEventListener('click', () => { const totalPages = Math.ceil(records.length / rowsPerPage); if (currentPage < totalPages) { currentPage++; renderP2Records(); } });
+
+// 初始化圖表互動與紀錄清單
+initVtGraphInteractivity('p1');
+initVtGraphInteractivity('p2');
+renderP1Records();
+</script>
+
+</body>
+</html>
