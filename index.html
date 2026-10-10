@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>加速度積分 與 GPS 測速器 longhorn 5.0</title>
+  <title>加速度積分 與 GPS 測速器 longhorn 5.1</title>
   <style>
   /* --- 基礎樣式還原 --- */
   * { box-sizing: border-box; }
@@ -201,7 +201,6 @@
     text-align: center;
   }
 
-  /* 模式切換按鈕樣式 */
   .btn-mode-unselected {
     background: transparent;
     color: #aaa;
@@ -214,7 +213,6 @@
     border: 1.5px solid #ff9800 !important;
   }
 
-  /* --- v-t 圖表區塊 --- */
   .graph-container {
     margin: 15px 0;
     width: 100%;
@@ -256,7 +254,6 @@
   .graph-grid line { stroke: #282828; stroke-width: 1; stroke-dasharray: 3, 3; }
   .graph-grid line.axis-line { stroke: #555555; stroke-width: 1.5; stroke-dasharray: none; }
 
-  /* 積分速度線 (橘) 與 GPS 速度線 (青藍) */
   .vt-line-path { fill: none; stroke: #ff9800; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
   .vt-gps-line-path { fill: none; stroke: #00bcd4; stroke-width: 2.0; stroke-linecap: round; stroke-linejoin: round; }
   .vt-area-path { fill: #ff9800; fill-opacity: 0.12; stroke: none; }
@@ -271,14 +268,12 @@
     font-size: 0.7rem; font-weight: bold; cursor: pointer; z-index: 10; display: none;
   }
 
-  /* 互動提示層 (Tooltip & Guide Line) */
   .interactive-guideline { stroke: #ff9800; stroke-width: 1; stroke-dasharray: 4, 4; opacity: 0.7; }
   .interactive-focus-point { fill: #ff9800; stroke: #ffffff; stroke-width: 2; }
   .interactive-gps-focus-point { fill: #00bcd4; stroke: #ffffff; stroke-width: 2; }
   .interactive-tooltip-bg { fill: rgba(20, 20, 20, 0.94); stroke: #ff9800; stroke-width: 1; rx: 6; ry: 6; }
   .interactive-tooltip-text { fill: #ffffff; font-size: 10px; font-family: monospace !important; font-weight: bold; }
 
-  /* --- 歷史紀錄表格樣式 --- */
   .category-title { color: #fff !important; font-size: 0.95rem; font-weight: 800; }
 
   .page-header-row {
@@ -362,7 +357,7 @@
       <button id="btn-request-gps" class="btn-fill" style="color: #00bcd4; border-color: #00bcd4;">開啟 GPS 定位</button>
     </div>
 
-    <!-- 模式切換按鈕列 (與上方同樣式排版) -->
+    <!-- 模式切換按鈕列 -->
     <div id="mode-btn-container" style="margin-bottom: 12px; display: flex; gap: 8px;">
       <button id="btn-mode-other" class="btn-fill btn-mode-selected">一般模式</button>
       <button id="btn-mode-railway" class="btn-fill btn-mode-unselected">鐵路模式</button>
@@ -444,7 +439,7 @@
       </div>
     </div>
 
-    <!-- 第一頁：即時 v-t 圖表 (包含積分與 GPS 雙曲線) -->
+    <!-- 第一頁：即時 v-t 圖表 -->
     <div class="graph-container" id="p1-vtContainer">
       <button id="p1-btnResetZoom" class="btn-reset-zoom">重置縮放</button>
       <div class="graph-placeholder" id="p1-vtPlaceholder">
@@ -503,7 +498,6 @@
       <div style="width: 32px;"></div>
     </div>
 
-    <!-- 最上方 v-t 圖表渲染位置 -->
     <div class="graph-container" id="p2-vtContainer">
       <button id="p2-btnResetZoom" class="btn-reset-zoom">重置縮放</button>
       <div class="graph-placeholder" id="p2-vtPlaceholder">
@@ -530,7 +524,6 @@
       </svg>
     </div>
 
-    <!-- 第二頁：全面性紀錄表格 -->
     <div class="record-card" style="margin-top: 10px;">
       <div class="record-header">
         <span style="font-size: 0.8rem; color: #aaa;">詳細數據對照表</span>
@@ -569,7 +562,7 @@
   </div>
 
   <div style="text-align: center; font-size: 0.75rem; color: #555; margin-top: 15px;">
-    longhorn 5.0
+    longhorn 5.1
   </div>
 </div>
 
@@ -609,23 +602,20 @@ let lpfAlpha = 0.20;
 let vtPointsData = [];
 let p2ActivePointsData = [];
 
-// 圖表縮放與平移狀態管理
 const graphStates = {
   p1: { zoomScale: 1.0, panTranslateX: 0.0, initialPinchDistance: null, initialScale: 1.0, isDragging: false, startDragX: 0, startPanX: 0 },
   p2: { zoomScale: 1.0, panTranslateX: 0.0, initialPinchDistance: null, initialScale: 1.0, isDragging: false, startDragX: 0, startPanX: 0 }
 };
 
-// localStorage 讀取 (canary 5.0)
 let records = [];
 try {
-  const savedRecords = localStorage.getItem('speedometer_records_canary50');
+  const savedRecords = localStorage.getItem('speedometer_records_canary51');
   if (savedRecords) records = JSON.parse(savedRecords);
 } catch (e) {}
 
 let currentPage = 1;
 const rowsPerPage = 5;
 
-// DOM 元素
 const page1 = document.getElementById('page-1');
 const page2 = document.getElementById('page-2');
 const btnGoPage2 = document.getElementById('btn-go-page2');
@@ -670,7 +660,6 @@ const btnPrevPage = document.getElementById('btn-prev-page');
 const btnNextPage = document.getElementById('btn-next-page');
 const pageInfoEl = document.getElementById('page-info');
 
-// 模式切換按鈕事件綁定
 btnModeOther.addEventListener('click', () => {
   isRailwayMode = false;
   btnModeOther.className = "btn-fill btn-mode-selected";
@@ -683,7 +672,6 @@ btnModeRailway.addEventListener('click', () => {
   btnModeOther.className = "btn-fill btn-mode-unselected";
 });
 
-// 頁面切換控制
 btnGoPage2.addEventListener('click', () => {
   page1.classList.remove('active');
   page2.classList.add('active');
@@ -696,7 +684,6 @@ btnBackP1.addEventListener('click', () => {
   renderP1Records();
 });
 
-// 感測器權限與啟動
 document.getElementById('btn-request-permission').addEventListener('click', () => {
   if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
     DeviceMotionEvent.requestPermission().then(state => {
@@ -709,7 +696,7 @@ document.getElementById('btn-request-permission').addEventListener('click', () =
 
 document.getElementById('btn-request-gps').addEventListener('click', () => { initGpsListener(); });
 
-// 感測器監聽 (包含鐵路模式智慧運算過濾)
+// 感測器監聽 (Longhorn 5.1 鐵路模式：高速 > 80 km/h 時套用 3% 坡度重力極限與 5% 誤差容忍)
 function initSensorListener() {
   window.addEventListener('devicemotion', (event) => {
     if (!event.accelerationIncludingGravity) return;
@@ -724,10 +711,15 @@ function initSensorListener() {
     let cleanAccelY = filteredY - yOffset;
     if (Math.abs(cleanAccelY) < 0.008) cleanAccelY = 0.0;
 
-    // 鐵路模式邏輯處理
+    // 鐵路模式邏輯處理 (Longhorn 5.1 升級)
     if (isRailwayMode) {
       let currentSpeedKmh = currentSpeed * 3.6;
-      if (currentSpeedKmh > 8.0 && Math.abs(cleanAccelY) < 0.05) {
+      if (currentSpeedKmh > 80.0) {
+        let gradeThreshold = 9.81 * 0.03 * 1.05; // 3% 坡度重力分量 + 5% 誤差緩衝 (約 0.309 m/s²)
+        if (Math.abs(cleanAccelY) < gradeThreshold) {
+          cleanAccelY = 0.0;
+        }
+      } else if (currentSpeedKmh > 8.0 && Math.abs(cleanAccelY) < 0.05) {
         cleanAccelY = 0.0;
       }
     }
@@ -847,7 +839,6 @@ function initGpsListener() {
   );
 }
 
-// 應用 transform 矩陣轉換與更新刻度
 function applyZoomTransform(prefix) {
   const st = graphStates[prefix];
   const zoomGroup = document.getElementById(`${prefix}-vtZoomGroup`);
@@ -883,7 +874,6 @@ function applyZoomTransform(prefix) {
   zoomLabelsEl.innerHTML = zoomLabelsHtml;
 }
 
-// 通用繪製 v-t 圖表
 function drawGraphToElement(prefix, points) {
   const container = document.getElementById(`${prefix}-vtContainer`);
   const gridEl = document.getElementById(`${prefix}-vtGrid`);
@@ -964,7 +954,6 @@ function drawGraphToElement(prefix, points) {
   applyZoomTransform(prefix);
 }
 
-// 手勢與互動事件初始化
 function initVtGraphInteractivity(prefix) {
   const container = document.getElementById(`${prefix}-vtContainer`);
   const graph = document.getElementById(`${prefix}-vtGraph`);
@@ -1134,7 +1123,6 @@ function initVtGraphInteractivity(prefix) {
   graph.addEventListener('mouseleave', () => { if (interactiveEl) interactiveEl.style.display = "none"; });
 }
 
-// 計時器
 function updateGlobalTimer() {
   if (isAccelRecording || isGpsRecording) {
     if (recordingStartTime !== null) {
@@ -1165,7 +1153,6 @@ function resetZoomState(prefix) {
   applyZoomTransform(prefix);
 }
 
-// 控制按鈕綁定
 btnZero.addEventListener('click', () => {
   xOffset = filteredX; yOffset = filteredY; isCalibrated = true;
   currentSpeed = 0.0; totalDisplacement = 0.0; totalGpsDisplacement = 0.0;
@@ -1259,7 +1246,7 @@ function addRecord(maxSpeed, maxGpsSpeed, displacement, gpsDisplacement, duratio
   records.unshift({
     id: Date.now(), time: timeStr,
     maxSpeed: hasAccelData ? maxSpeed.toFixed(1) + " km/h" : "N/A",
-    maxGpsSpeed: hasGpsData ? maxGpsSpeed.toFixed(1) + " km/h" : "N/A",
+    maxGpsSpeed: hasGpsSpeed ? maxGpsSpeed.toFixed(1) + " km/h" : "N/A",
     disp: dispStr, gpsDisp: gpsDispStr,
     duration: duration.toFixed(1) + " s",
     vtPoints: vtPoints || []
@@ -1271,7 +1258,7 @@ function addRecord(maxSpeed, maxGpsSpeed, displacement, gpsDisplacement, duratio
 }
 
 function saveRecordsToStorage() {
-  try { localStorage.setItem('speedometer_records_canary50', JSON.stringify(records)); } catch (e) {}
+  try { localStorage.setItem('speedometer_records_canary51', JSON.stringify(records)); } catch (e) {}
 }
 
 function renderP1Records() {
@@ -1389,7 +1376,6 @@ function downloadCsvBlob(content, filename) {
 btnPrevPage.addEventListener('click', () => { if (currentPage > 1) { currentPage--; renderP2Records(); } });
 btnNextPage.addEventListener('click', () => { const totalPages = Math.ceil(records.length / rowsPerPage); if (currentPage < totalPages) { currentPage++; renderP2Records(); } });
 
-// 初始化圖表互動與紀錄清單
 initVtGraphInteractivity('p1');
 initVtGraphInteractivity('p2');
 renderP1Records();
