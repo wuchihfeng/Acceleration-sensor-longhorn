@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>加速度積分 與 GPS 測速器 longhorn 5.5</title>
+  <title>加速度積分 與 GPS 測速器 longhorn 5.6</title>
   <style>
   /* --- 基礎樣式還原 --- */
   * { box-sizing: border-box; }
@@ -562,7 +562,7 @@
   </div>
 
   <div style="text-align: center; font-size: 0.75rem; color: #555; margin-top: 15px;">
-    longhorn 5.5
+    longhorn 5.6
   </div>
 </div>
 
@@ -725,11 +725,9 @@ function initSensorListener() {
       }
     }
 
-    // Longhorn 5.5 更新：當速度大於 40 km/h 且加速度絕對值小於 0.08 m/s² 時不採計
-    if (currentSpeedKmh > 40.0 && Math.abs(cleanAccelY) < 0.08) {
-      cleanAccelY = 0.0;
-    }
-
+    if (currentSpeedKmh > 40.0 && Math.abs(cleanAccelY) < 0.05) {
+  cleanAccelY = 0.0;
+}
     accelValEl.textContent = cleanAccelY.toFixed(3);
     gValEl.textContent = (cleanAccelY / 9.80665).toFixed(3);
     accelXValEl.textContent = cleanAccelX.toFixed(3);
