@@ -562,7 +562,7 @@
   </div>
 
   <div style="text-align: center; font-size: 0.75rem; color: #555; margin-top: 15px;">
-    longhorn 5.2
+    longhorn 5.2 (wuchihfeng confidential)
   </div>
 </div>
 
@@ -696,7 +696,7 @@ document.getElementById('btn-request-permission').addEventListener('click', () =
 
 document.getElementById('btn-request-gps').addEventListener('click', () => { initGpsListener(); });
 
-// 感測器監聽 (Longhorn 5.2 鐵路模式：門檻下修至 0.15 m/s² 支援短站距與動態巡航)
+// 感測器監聽 (Longhorn 5.2 鐵路模式：對應 2% 坡度，門檻調整為 0.196 m/s²)
 function initSensorListener() {
   window.addEventListener('devicemotion', (event) => {
     if (!event.accelerationIncludingGravity) return;
@@ -711,11 +711,11 @@ function initSensorListener() {
     let cleanAccelY = filteredY - yOffset;
     if (Math.abs(cleanAccelY) < 0.008) cleanAccelY = 0.0;
 
-    // 鐵路模式邏輯處理 (Longhorn 5.2 最佳化)
+    // 鐵路模式邏輯處理 (Longhorn 5.2 2% 坡度精準補償)
     if (isRailwayMode) {
       let currentSpeedKmh = currentSpeed * 3.6;
       if (currentSpeedKmh > 30.0) {
-        let gradeThreshold = 0.15; // 下修至 0.15 m/s² 避免過度誤殺緩加速
+        let gradeThreshold = 0.196; // 2% 坡度重力分量 (9.81 * 0.02)
         if (Math.abs(cleanAccelY) < gradeThreshold) {
           cleanAccelY = 0.0;
         }
