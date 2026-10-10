@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>加速度積分 與 GPS 測速器 longhorn 5.3</title>
+  <title>加速度積分 與 GPS 測速器 longhorn 5.4</title>
   <style>
   /* --- 基礎樣式還原 --- */
   * { box-sizing: border-box; }
@@ -562,7 +562,7 @@
   </div>
 
   <div style="text-align: center; font-size: 0.75rem; color: #555; margin-top: 15px;">
-    longhorn 5.3
+    longhorn 5.4
   </div>
 </div>
 
@@ -609,7 +609,7 @@ const graphStates = {
 
 let records = [];
 try {
-  const savedRecords = localStorage.getItem('longhorn_records_v53');
+  const savedRecords = localStorage.getItem('longhorn_records_v54');
   if (savedRecords) records = JSON.parse(savedRecords);
 } catch (e) {}
 
@@ -696,7 +696,7 @@ document.getElementById('btn-request-permission').addEventListener('click', () =
 
 document.getElementById('btn-request-gps').addEventListener('click', () => { initGpsListener(); });
 
-// 感測器監聽 (Longhorn 5.3 鐵路模式：門檻調整為 0.196 m/s²，對應 2% 坡度重力補償)
+// 感測器監聽 (Longhorn 5.4 鐵路模式與速度/加速度過濾)
 function initSensorListener() {
   window.addEventListener('devicemotion', (event) => {
     if (!event.accelerationIncludingGravity) return;
@@ -711,9 +711,10 @@ function initSensorListener() {
     let cleanAccelY = filteredY - yOffset;
     if (Math.abs(cleanAccelY) < 0.008) cleanAccelY = 0.0;
 
-    // 鐵路模式邏輯處理 (Longhorn 5.3)
+    let currentSpeedKmh = currentSpeed * 3.6;
+
+    // 鐵路模式邏輯處理 (Longhorn 5.4)
     if (isRailwayMode) {
-      let currentSpeedKmh = currentSpeed * 3.6;
       if (currentSpeedKmh > 30.0) {
         let gradeThreshold = 0.196; // 2% 坡度重力分量
         if (Math.abs(cleanAccelY) < gradeThreshold) {
@@ -722,6 +723,11 @@ function initSensorListener() {
       } else if (currentSpeedKmh > 8.0 && Math.abs(cleanAccelY) < 0.05) {
         cleanAccelY = 0.0;
       }
+    }
+
+    // 新增條件：當速度大於 40 km/h 且加速度小於 0.1 m/s² 時不採計（加速度歸零）
+    if (currentSpeedKmh > 40.0 && Math.abs(cleanAccelY) < 0.1) {
+      cleanAccelY = 0.0;
     }
 
     accelValEl.textContent = cleanAccelY.toFixed(3);
@@ -1175,7 +1181,6 @@ btnZero.addEventListener('click', () => {
 
 // 強制且穩定儲存紀錄的核心函數
 function trySaveRecordOnStop() {
-  // 不再把「必須有兩個曲線點」當成儲存紀錄的必要條件；GPS-only 或感測器取樣失敗時也保留測量摘要。
   if (totalRecordedTime > 0.5) {
     const hasAccel = maxSpeedKmh > 0 || totalDisplacement > 0 || isAccelRecording;
     const hasGps = maxGpsSpeedKmh > 0 || totalGpsDisplacement > 0 || isGpsRecording;
@@ -1270,7 +1275,7 @@ function addRecord(maxSpeed, maxGpsSpeed, displacement, gpsDisplacement, duratio
 }
 
 function saveRecordsToStorage() {
-  try { localStorage.setItem('longhorn_records_v53', JSON.stringify(records)); } catch (e) {}
+  try { localStorage.setItem('longhorn_records_v54', JSON.stringify(records)); } catch (e) {}
 }
 
 function renderP1Records() {
@@ -1395,4 +1400,4 @@ renderP1Records();
 </script>
 
 </body>
-</html>
+</html>a
