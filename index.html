@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>加速度積分 與 GPS 測速器 longhorn 5.1</title>
+  <title>加速度積分 與 GPS 測速器 longhorn 5.2</title>
   <style>
   /* --- 基礎樣式還原 --- */
   * { box-sizing: border-box; }
@@ -562,7 +562,7 @@
   </div>
 
   <div style="text-align: center; font-size: 0.75rem; color: #555; margin-top: 15px;">
-    longhorn 5.1
+    longhorn 5.2 (wuchihfeng confidential)
   </div>
 </div>
 
@@ -609,7 +609,7 @@ const graphStates = {
 
 let records = [];
 try {
-  const savedRecords = localStorage.getItem('speedometer_records_canary51');
+  const savedRecords = localStorage.getItem('longhorn_records_v52');
   if (savedRecords) records = JSON.parse(savedRecords);
 } catch (e) {}
 
@@ -696,7 +696,7 @@ document.getElementById('btn-request-permission').addEventListener('click', () =
 
 document.getElementById('btn-request-gps').addEventListener('click', () => { initGpsListener(); });
 
-// 感測器監聽 (Longhorn 5.1 鐵路模式：高速 > 80 km/h 時套用 3% 坡度重力極限與 5% 誤差容忍)
+// 感測器監聽 (Longhorn 5.2 鐵路模式：門檻下修至 0.15 m/s² 支援短站距與動態巡航)
 function initSensorListener() {
   window.addEventListener('devicemotion', (event) => {
     if (!event.accelerationIncludingGravity) return;
@@ -711,11 +711,11 @@ function initSensorListener() {
     let cleanAccelY = filteredY - yOffset;
     if (Math.abs(cleanAccelY) < 0.008) cleanAccelY = 0.0;
 
-    // 鐵路模式邏輯處理 (Longhorn 5.1 升級)
+    // 鐵路模式邏輯處理 (Longhorn 5.2 最佳化)
     if (isRailwayMode) {
       let currentSpeedKmh = currentSpeed * 3.6;
-      if (currentSpeedKmh > 80.0) {
-        let gradeThreshold = 9.81 * 0.03 * 1.05; // 3% 坡度重力分量 + 5% 誤差緩衝 (約 0.309 m/s²)
+      if (currentSpeedKmh > 30.0) {
+        let gradeThreshold = 0.15; // 下修至 0.15 m/s² 避免過度誤殺緩加速
         if (Math.abs(cleanAccelY) < gradeThreshold) {
           cleanAccelY = 0.0;
         }
@@ -1258,7 +1258,7 @@ function addRecord(maxSpeed, maxGpsSpeed, displacement, gpsDisplacement, duratio
 }
 
 function saveRecordsToStorage() {
-  try { localStorage.setItem('speedometer_records_canary51', JSON.stringify(records)); } catch (e) {}
+  try { localStorage.setItem('longhorn_records_v52', JSON.stringify(records)); } catch (e) {}
 }
 
 function renderP1Records() {
