@@ -918,7 +918,7 @@ function drawGraphToElement(prefix, points) {
   }
 
   gridEl.innerHTML = gridLines;
-  fixedLabelsHtml.innerHTML = fixedLabelsHtml;
+  fixedLabelsEl.innerHTML = fixedLabelsHtml;
 
   if (points.length < 2) {
     container.classList.remove('has-data');
@@ -1175,9 +1175,10 @@ btnZero.addEventListener('click', () => {
 
 // 強制且穩定儲存紀錄的核心函數
 function trySaveRecordOnStop() {
-  if (totalRecordedTime > 0.5 && vtPointsData.length > 1) {
-    const hasAccel = maxSpeedKmh > 0 || totalDisplacement > 0;
-    const hasGps = maxGpsSpeedKmh > 0 || totalGpsDisplacement > 0;
+  // 不再把「必須有兩個曲線點」當成儲存紀錄的必要條件；GPS-only 或感測器取樣失敗時也保留測量摘要。
+  if (totalRecordedTime > 0.5) {
+    const hasAccel = maxSpeedKmh > 0 || totalDisplacement > 0 || isAccelRecording;
+    const hasGps = maxGpsSpeedKmh > 0 || totalGpsDisplacement > 0 || isGpsRecording;
     addRecord(maxSpeedKmh, maxGpsSpeedKmh, totalDisplacement, totalGpsDisplacement, totalRecordedTime, hasAccel, hasGps, [...vtPointsData]);
   }
 }
@@ -1192,7 +1193,7 @@ btnToggleAccel.addEventListener('click', async () => {
     lastAccelTimestamp = performance.now(); startRecordingTimer(); await requestWakeLock();
   } else {
     btnToggleAccel.textContent = "錄製積分"; btnToggleAccel.className = "ctrl-btn btn-gmeter-idle";
-    trySaveRecordOnStop();
+    if (!isAccelRecording && !isGpsRecording) trySaveRecordOnStop();
     await checkWakeLockState();
   }
 });
@@ -1205,12 +1206,15 @@ btnToggleGps.addEventListener('click', async () => {
     startRecordingTimer(); await requestWakeLock();
   } else {
     btnToggleGps.textContent = "錄製 GPS"; btnToggleGps.className = "ctrl-btn btn-gps-idle";
-    trySaveRecordOnStop();
+    if (!isAccelRecording && !isGpsRecording) trySaveRecordOnStop();
     await checkWakeLockState();
   }
 });
 
 btnReset.addEventListener('click', async () => {
+  if (recordingStartTime !== null && (isAccelRecording || isGpsRecording)) {
+    totalRecordedTime = (performance.now() - recordingStartTime) / 1000.0;
+  }
   if (isAccelRecording || isGpsRecording || totalRecordedTime > 0.5) {
     trySaveRecordOnStop();
   }
@@ -1229,6 +1233,7 @@ btnReset.addEventListener('click', async () => {
   document.getElementById('p1-vtLine').setAttribute('d', '');
   document.getElementById('p1-vtGpsLine').setAttribute('d', '');
   document.getElementById('p1-vtArea').setAttribute('d', '');
+  document.getElementById('p1-vtInteractive').style.display = 'none';
 
   speedValEl.textContent = "0.0"; gpsSpeedValEl.textContent = "0.0";
   maxSpeedValEl.textContent = "0.0"; gpsMaxSpeedValEl.textContent = "0.0";
@@ -1253,7 +1258,7 @@ function addRecord(maxSpeed, maxGpsSpeed, displacement, gpsDisplacement, duratio
   records.unshift({
     id: Date.now(), time: timeStr,
     maxSpeed: hasAccelData ? maxSpeed.toFixed(1) + " km/h" : "N/A",
-    maxGpsSpeed: hasGpsSpeed ? maxGpsSpeed.toFixed(1) + " km/h" : "N/A",
+    maxGpsSpeed: hasGpsData ? maxGpsSpeed.toFixed(1) + " km/h" : "N/A",
     disp: dispStr, gpsDisp: gpsDispStr,
     duration: duration.toFixed(1) + " s",
     vtPoints: vtPoints || []
@@ -1378,6 +1383,7 @@ function downloadCsvBlob(content, filename) {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 btnPrevPage.addEventListener('click', () => { if (currentPage > 1) { currentPage--; renderP2Records(); } });
