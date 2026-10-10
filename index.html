@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>加速度積分 與 GPS 測速器 longhorn 5.2</title>
+  <title>加速度積分 與 GPS 測速器 longhorn 5.3</title>
   <style>
   /* --- 基礎樣式還原 --- */
   * { box-sizing: border-box; }
@@ -562,7 +562,7 @@
   </div>
 
   <div style="text-align: center; font-size: 0.75rem; color: #555; margin-top: 15px;">
-    longhorn 5.2
+    longhorn 5.3
   </div>
 </div>
 
@@ -609,7 +609,7 @@ const graphStates = {
 
 let records = [];
 try {
-  const savedRecords = localStorage.getItem('longhorn_records_v52');
+  const savedRecords = localStorage.getItem('longhorn_records_v53');
   if (savedRecords) records = JSON.parse(savedRecords);
 } catch (e) {}
 
@@ -696,7 +696,7 @@ document.getElementById('btn-request-permission').addEventListener('click', () =
 
 document.getElementById('btn-request-gps').addEventListener('click', () => { initGpsListener(); });
 
-// 感測器監聽 (Longhorn 5.2 鐵路模式：對應 2% 坡度，門檻調整為 0.196 m/s²)
+// 感測器監聽 (Longhorn 5.3 鐵路模式：門檻調整為 0.196 m/s²，對應 2% 坡度重力補償)
 function initSensorListener() {
   window.addEventListener('devicemotion', (event) => {
     if (!event.accelerationIncludingGravity) return;
@@ -711,11 +711,11 @@ function initSensorListener() {
     let cleanAccelY = filteredY - yOffset;
     if (Math.abs(cleanAccelY) < 0.008) cleanAccelY = 0.0;
 
-    // 鐵路模式邏輯處理 (Longhorn 5.2 2% 坡度精準補償)
+    // 鐵路模式邏輯處理 (Longhorn 5.3)
     if (isRailwayMode) {
       let currentSpeedKmh = currentSpeed * 3.6;
       if (currentSpeedKmh > 30.0) {
-        let gradeThreshold = 0.196; // 2% 坡度重力分量 (9.81 * 0.02)
+        let gradeThreshold = 0.196; // 2% 坡度重力分量
         if (Math.abs(cleanAccelY) < gradeThreshold) {
           cleanAccelY = 0.0;
         }
@@ -1173,6 +1173,15 @@ btnZero.addEventListener('click', () => {
   calibStatusEl.textContent = "已完成校準：靜態偏置已鎖定";
 });
 
+// 強制且穩定儲存紀錄的核心函數
+function trySaveRecordOnStop() {
+  if (totalRecordedTime > 0.5 && vtPointsData.length > 1) {
+    const hasAccel = maxSpeedKmh > 0 || totalDisplacement > 0;
+    const hasGps = maxGpsSpeedKmh > 0 || totalGpsDisplacement > 0;
+    addRecord(maxSpeedKmh, maxGpsSpeedKmh, totalDisplacement, totalGpsDisplacement, totalRecordedTime, hasAccel, hasGps, [...vtPointsData]);
+  }
+}
+
 btnToggleAccel.addEventListener('click', async () => {
   if (!isCalibrated && !isAccelRecording) {
     if (!confirm("⚠️ 尚未執行矯正歸零，建議在車站靜止時按下「矯正歸零」！確定直接開始？")) return;
@@ -1183,7 +1192,8 @@ btnToggleAccel.addEventListener('click', async () => {
     lastAccelTimestamp = performance.now(); startRecordingTimer(); await requestWakeLock();
   } else {
     btnToggleAccel.textContent = "錄製積分"; btnToggleAccel.className = "ctrl-btn btn-gmeter-idle";
-    saveCurrentRecord(true, isGpsRecording); await checkWakeLockState();
+    trySaveRecordOnStop();
+    await checkWakeLockState();
   }
 });
 
@@ -1195,18 +1205,15 @@ btnToggleGps.addEventListener('click', async () => {
     startRecordingTimer(); await requestWakeLock();
   } else {
     btnToggleGps.textContent = "錄製 GPS"; btnToggleGps.className = "ctrl-btn btn-gps-idle";
-    saveCurrentRecord(isAccelRecording, true); await checkWakeLockState();
+    trySaveRecordOnStop();
+    await checkWakeLockState();
   }
 });
 
-function saveCurrentRecord(hasAccel, hasGps) {
-  if (totalRecordedTime > 0.2) {
-    addRecord(maxSpeedKmh, maxGpsSpeedKmh, totalDisplacement, totalGpsDisplacement, totalRecordedTime, hasAccel || maxSpeedKmh > 0, hasGps || maxGpsSpeedKmh > 0, [...vtPointsData]);
-  }
-}
-
 btnReset.addEventListener('click', async () => {
-  if (isAccelRecording || isGpsRecording) saveCurrentRecord(isAccelRecording, isGpsRecording);
+  if (isAccelRecording || isGpsRecording || totalRecordedTime > 0.5) {
+    trySaveRecordOnStop();
+  }
   isAccelRecording = false; isGpsRecording = false;
   btnToggleAccel.textContent = "錄製積分"; btnToggleAccel.className = "ctrl-btn btn-gmeter-idle";
   btnToggleGps.textContent = "錄製 GPS"; btnToggleGps.className = "ctrl-btn btn-gps-idle";
@@ -1258,7 +1265,7 @@ function addRecord(maxSpeed, maxGpsSpeed, displacement, gpsDisplacement, duratio
 }
 
 function saveRecordsToStorage() {
-  try { localStorage.setItem('longhorn_records_v52', JSON.stringify(records)); } catch (e) {}
+  try { localStorage.setItem('longhorn_records_v53', JSON.stringify(records)); } catch (e) {}
 }
 
 function renderP1Records() {
